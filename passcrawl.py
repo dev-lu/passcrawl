@@ -23,12 +23,14 @@ def display_ascii():
     print(ascii_text)
 
 
-def get_words_from_url(url, depth, visited_urls=None):
+def get_words_from_url(url, depth, visited_urls=None, word_counts=None):
     if visited_urls is None:
         visited_urls = set()
+    if word_counts is None:
+        word_counts = {}
 
     if depth == 0 or url in visited_urls:
-        return set()
+        return word_counts
 
     visited_urls.add(url)
 
@@ -37,14 +39,14 @@ def get_words_from_url(url, depth, visited_urls=None):
         response.raise_for_status()
     except requests.exceptions.RequestException as e:
         print(f"Error accessing URL {url}: {e}")
-        return set()
+        return word_counts
 
     soup = BeautifulSoup(response.text, 'html.parser')
-    words = set()
 
     # Extract text and tokenize words
     text = soup.get_text()
-    words.update(re.findall(r'\b\w+\b', text.lower()))
+    for word in re.findall(r'\b\w+\b', text.lower()):
+        word_counts[word] = word_counts.get(word, 0) + 1
 
     # Find links on page and crawl recursively
     parsed_url = urlparse(url)
@@ -58,10 +60,10 @@ def get_words_from_url(url, depth, visited_urls=None):
                 next_url = urlparse(base_url + href)
 
             if next_url.netloc == parsed_url.netloc:
-                words.update(get_words_from_url(
-                    next_url.geturl(), depth - 1, visited_urls))
+                word_counts.update(get_words_from_url(
+                    next_url.geturl(), depth - 1, visited_urls, word_counts))
 
-    return words
+    return word_counts
 
 
 def main():
@@ -71,18 +73,24 @@ def main():
     parser.add_argument("url", help="URL to start crawling from")
     parser.add_argument("-d", "--depth", type=int, default=1,
                         help="Crawling depth (default: 1)")
+    parser.add_argument("-m", "--min-occurrences", type=int, default=1,
+                        help="Minimum occurrences of a word to include in the list (default: 1)")
     parser.add_argument("-o", "--output", default="password_list.txt",
                         help="Output file name (default: password_list.txt)")
     args = parser.parse_args()
 
     try:
-        unique_words = get_words_from_url(args.url, args.depth)
+        word_counts = get_words_from_url(args.url, args.depth)
+        saved_word_count = 0
 
         with open(args.output, "w") as file:
-            for word in sorted(unique_words):
-                file.write(f"{word}\n")
+            for word, count in sorted(word_counts.items(), key=lambda x: x[0]):
+                if count >= args.min_occurrences:
+                    file.write(f"{word}\n")
+                    saved_word_count += 1
 
-        print(f"Unique words saved to {args.output}")
+        print(f"{len(word_counts.items())} words found")
+        print(f"{saved_word_count} words saved to {args.output}")
     except KeyboardInterrupt:
         print("\nCrawling aborted by user.")
     except Exception as e:
