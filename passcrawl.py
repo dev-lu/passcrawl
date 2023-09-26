@@ -3,6 +3,8 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 import re
+from functools import lru_cache
+from concurrent.futures import ThreadPoolExecutor
 import urllib3
 
 # Disable insecure request warnings globally
@@ -23,7 +25,18 @@ def display_ascii():
     print(ascii_text)
 
 
-def get_words_from_url(url, depth, visited_urls=None, word_counts=None):
+@lru_cache(maxsize=512)  # Store 512 requests in cache
+def fetch_url_content(url):
+    try:
+        response = requests.get(url, verify=False)
+        response.raise_for_status()
+        return response.text
+    except requests.exceptions.RequestException as e:
+        print(f"Error accessing URL {url}: {e}")
+        return None
+
+
+def get_words_from_url(url, depth, max_threads, visited_urls=None, word_counts=None):
     if visited_urls is None:
         visited_urls = set()
     if word_counts is None:
@@ -34,14 +47,13 @@ def get_words_from_url(url, depth, visited_urls=None, word_counts=None):
 
     visited_urls.add(url)
 
-    try:
-        response = requests.get(url, verify=False)
-        response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        print(f"Error accessing URL {url}: {e}")
+    content = fetch_url_content(url)
+    if content is None:
         return word_counts
 
-    soup = BeautifulSoup(response.text, 'html.parser')
+    print(f"Crawl {url}")
+
+    soup = BeautifulSoup(content, 'html.parser')
 
     # Extract text and tokenize words
     text = soup.get_text()
@@ -51,6 +63,7 @@ def get_words_from_url(url, depth, visited_urls=None, word_counts=None):
     # Find links on page and crawl recursively
     parsed_url = urlparse(url)
     base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+    next_urls = []
 
     for link in soup.find_all('a'):
         href = link.get('href')
@@ -58,11 +71,16 @@ def get_words_from_url(url, depth, visited_urls=None, word_counts=None):
             next_url = urlparse(href)
             if not next_url.netloc:
                 next_url = urlparse(base_url + href)
-
             if next_url.netloc == parsed_url.netloc:
-                word_counts.update(get_words_from_url(
-                    next_url.geturl(), depth - 1, visited_urls, word_counts))
+                next_urls.append(next_url.geturl())
 
+    # Use concurrency to crawl multiple URLs
+    with ThreadPoolExecutor(max_workers=max_threads) as executor:
+        futures = [executor.submit(get_words_from_url, next_url, depth - 1,
+                                   max_threads, visited_urls, word_counts) for next_url in next_urls]
+
+        for future in futures:
+            word_counts.update(future.result())
     return word_counts
 
 
@@ -77,10 +95,12 @@ def main():
                         help="Minimum occurrences of a word to include in the list (default: 1)")
     parser.add_argument("-o", "--output", default="password_list.txt",
                         help="Output file name (default: password_list.txt)")
+    parser.add_argument("-t", "--threads", type=int, default=1,
+                        help="Number of threads for concurrent crawling (default: 1)")
     args = parser.parse_args()
 
     try:
-        word_counts = get_words_from_url(args.url, args.depth)
+        word_counts = get_words_from_url(args.url, args.depth, args.threads)
         saved_word_count = 0
 
         with open(args.output, "w") as file:
@@ -89,7 +109,7 @@ def main():
                     file.write(f"{word}\n")
                     saved_word_count += 1
 
-        print(f"{len(word_counts.items())} words found")
+        print(f"\n{len(word_counts.items())} words found")
         print(f"{saved_word_count} words saved to {args.output}")
     except KeyboardInterrupt:
         print("\nCrawling aborted by user.")

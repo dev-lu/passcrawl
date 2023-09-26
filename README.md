@@ -1,4 +1,5 @@
 # PassCrawl 🛡️
+
 ## Password List Generator
 
 PassCrawl is a tool that generates custom password lists from crawled URLs. Perfect for ethical hackers, penetration testers, and cybersecurity enthusiasts, this tool will help you create specific and targeted password lists by utilizing web content.
@@ -37,8 +38,11 @@ Parameters:
 
 - `-d <link depth>`: Specify the depth of links to crawl. For example, `-d 2` will crawl the main page and one level deep into the linked pages.
 - `-o <output filename>`: Name of the file to store the generated password list.
+- `-m <minimum occurrences>`: Set the minimum amount of occurrences to include a word to the list.
+- `-t <specify number of threads>`: Set the number of threads used to crawl URLs.
 
 Example:
+
 ```bash
 python passcrawl.py https://example.com -d 2 -o passwordlist.txt
 ```
