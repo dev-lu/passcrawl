@@ -5,10 +5,17 @@ from urllib.parse import urlparse
 import re
 from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor
+from tabulate import tabulate
+import time
 import urllib3
 
 # Disable insecure request warnings globally
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+number_of_urls = 0
+numer_of_crawling_errors = 0
+word_counts = 0
+saved_word_count = 0
 
 
 def display_ascii():
@@ -25,14 +32,24 @@ def display_ascii():
     print(ascii_text)
 
 
+def print_centered(text, width=80, char='='):
+    padded_text = text + ' '
+    print(padded_text.center(width, char))
+
+
 @lru_cache(maxsize=512)  # Store 512 requests in cache
 def fetch_url_content(url):
+    global number_of_urls
+    global numer_of_crawling_errors
+
     try:
         response = requests.get(url, verify=False)
         response.raise_for_status()
+        number_of_urls += 1
         return response.text
     except requests.exceptions.RequestException as e:
         print(f"Error accessing URL {url}: {e}")
+        numer_of_crawling_errors += 1
         return None
 
 
@@ -85,6 +102,10 @@ def get_words_from_url(url, depth, max_threads, visited_urls=None, word_counts=N
 
 
 def main():
+    global saved_word_count
+    global word_counts
+
+    start_time = time.perf_counter()
     display_ascii()
     parser = argparse.ArgumentParser(
         description="PassCrawl is generates custom password lists from crawled URLs. Perfect for ethical hackers, penetration testers, and cybersecurity enthusiasts, PassCrawl will help you create specific and targeted password lists by utilizing web content.")
@@ -109,12 +130,28 @@ def main():
                     file.write(f"{word}\n")
                     saved_word_count += 1
 
-        print(f"\n{len(word_counts.items())} words found")
-        print(f"{saved_word_count} words saved to {args.output}")
     except KeyboardInterrupt:
         print("\nCrawling aborted by user.")
     except Exception as e:
         print(f"An error occurred: {e}")
+
+    cache_info = fetch_url_content.cache_info()
+    duration = time.perf_counter() - start_time
+
+    stats = [
+        ["Words found", len(word_counts.items())],
+        [f"Words saved to {args.output}", saved_word_count],
+        ["Number of URLs crawled", number_of_urls],
+        ["Number of crawling errors", numer_of_crawling_errors],
+        ["Duration (seconds)", duration],
+        ["Cache Info",
+            f"hits: {cache_info.hits}, misses: {cache_info.misses}, maxsize: {cache_info.maxsize}, currsize: {cache_info.currsize}"],
+    ]
+
+    print("\n")
+    print_centered(" STATISTICS ")
+    table_str = tabulate(stats, tablefmt="plain")
+    print(table_str)
 
 
 if __name__ == "__main__":
