@@ -114,6 +114,8 @@ def main():
                         help="Crawling depth (default: 1)")
     parser.add_argument("-m", "--min-occurrences", type=int, default=1,
                         help="Minimum occurrences of a word to include in the list (default: 1)")
+    parser.add_argument("-l", "--length", type=int, default=1,
+                        help="Minimum length of a word to include in the list (default: 1)")
     parser.add_argument("-o", "--output", default="password_list.txt",
                         help="Output file name (default: password_list.txt)")
     parser.add_argument("-t", "--threads", type=int, default=1,
@@ -126,7 +128,7 @@ def main():
 
         with open(args.output, "w") as file:
             for word, count in sorted(word_counts.items(), key=lambda x: x[0]):
-                if count >= args.min_occurrences:
+                if count >= args.min_occurrences and len(word) >= args.length:
                     file.write(f"{word}\n")
                     saved_word_count += 1
 

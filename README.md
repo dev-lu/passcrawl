@@ -39,6 +39,7 @@ Parameters:
 - `-d <link depth>`: Specify the depth of links to crawl. For example, `-d 2` will crawl the main page and one level deep into the linked pages.
 - `-o <output filename>`: Name of the file to store the generated password list.
 - `-m <minimum occurrences>`: Set the minimum amount of occurrences to include a word to the list.
+- `-l <minimum word length>`: Set the minimum length of a word to append to the list.
 - `-t <specify number of threads>`: Set the number of threads used to crawl URLs.
 
 Example:
