@@ -32,6 +32,13 @@ def display_ascii():
     print(ascii_text)
 
 
+def read_blacklist(filepath):
+    if not filepath:
+        return set()
+    with open(filepath, 'r') as file:
+        return set(line.strip().lower() for line in file.readlines())
+
+
 def print_centered(text, width=80, char='='):
     padded_text = text + ' '
     print(padded_text.center(width, char))
@@ -116,6 +123,8 @@ def main():
                         help="Minimum occurrences of a word to include in the list (default: 1)")
     parser.add_argument("-l", "--length", type=int, default=1,
                         help="Minimum length of a word to include in the list (default: 1)")
+    parser.add_argument("-b", "--blacklist", default=None,
+                        help="Path to a blacklist file containing words that should not be added to the final list.")
     parser.add_argument("-o", "--output", default="password_list.txt",
                         help="Output file name (default: password_list.txt)")
     parser.add_argument("-t", "--threads", type=int, default=1,
@@ -126,9 +135,10 @@ def main():
         word_counts = get_words_from_url(args.url, args.depth, args.threads)
         saved_word_count = 0
 
+        blacklisted_words = read_blacklist(args.blacklist)
         with open(args.output, "w") as file:
             for word, count in sorted(word_counts.items(), key=lambda x: x[0]):
-                if count >= args.min_occurrences and len(word) >= args.length:
+                if word not in blacklisted_words and count >= args.min_occurrences and len(word) >= args.length:
                     file.write(f"{word}\n")
                     saved_word_count += 1
 
