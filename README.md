@@ -40,6 +40,7 @@ Parameters:
 - `-o <output filename>`: Name of the file to store the generated password list.
 - `-m <minimum occurrences>`: Set the minimum amount of occurrences to include a word to the list.
 - `-l <minimum word length>`: Set the minimum length of a word to append to the list.
+- `-b <blacklist>`: Path to a blacklist file containing words that should not be added to the final list.
 - `-t <specify number of threads>`: Set the number of threads used to crawl URLs.
 
 Example:
