@@ -41,6 +41,7 @@ Parameters:
 - `-m <minimum occurrences>`: Set the minimum amount of occurrences to include a word to the list.
 - `-l <minimum word length>`: Set the minimum length of a word to append to the list.
 - `-b <blacklist>`: Path to a blacklist file containing words that should not be added to the final list.
+- `-p <proxy>`: File containing a list of proxies for proxy rotation.
 - `-t <specify number of threads>`: Set the number of threads used to crawl URLs.
 
 Example:
