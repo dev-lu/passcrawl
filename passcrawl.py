@@ -16,6 +16,8 @@ number_of_urls = 0
 numer_of_crawling_errors = 0
 word_counts = 0
 saved_word_count = 0
+proxies = []
+current_proxy_index = 0
 
 
 def display_ascii():
@@ -44,20 +46,42 @@ def print_centered(text, width=80, char='='):
     print(padded_text.center(width, char))
 
 
+def load_proxies(proxy_file):
+    global proxies
+    with open(proxy_file, 'r') as file:
+        proxies = [line.strip() for line in file.readlines() if line.strip()]
+
+
+def get_next_proxy():
+    global current_proxy_index
+    if not proxies:
+        return None
+    proxy = proxies[current_proxy_index]
+    current_proxy_index = (current_proxy_index + 1) % len(proxies)
+    return {
+        "http": f"http://{proxy}"
+    }
+
+
 @lru_cache(maxsize=512)  # Store 512 requests in cache
 def fetch_url_content(url):
     global number_of_urls
     global numer_of_crawling_errors
+    retry_count = len(proxies)
 
-    try:
-        response = requests.get(url, verify=False)
-        response.raise_for_status()
-        number_of_urls += 1
-        return response.text
-    except requests.exceptions.RequestException as e:
-        print(f"Error accessing URL {url}: {e}")
-        numer_of_crawling_errors += 1
-        return None
+    while retry_count > 0:
+        proxy = get_next_proxy()
+        try:
+            response = requests.get(url, verify=False, proxies=proxy)
+            response.raise_for_status()
+            number_of_urls += 1
+            return response.text
+        except requests.exceptions.RequestException as e:
+            print(f"Error accessing URL {url} using proxy {proxy}: {e}")
+            numer_of_crawling_errors += 1
+            retry_count -= 1
+
+    return None
 
 
 def get_words_from_url(url, depth, max_threads, visited_urls=None, word_counts=None):
@@ -125,11 +149,16 @@ def main():
                         help="Minimum length of a word to include in the list (default: 1)")
     parser.add_argument("-b", "--blacklist", default=None,
                         help="Path to a blacklist file containing words that should not be added to the final list.")
+    parser.add_argument("-p", "--proxy-file", default=None,
+                        help="File containing a list of proxies for proxy rotation.")
     parser.add_argument("-o", "--output", default="password_list.txt",
                         help="Output file name (default: password_list.txt)")
     parser.add_argument("-t", "--threads", type=int, default=1,
                         help="Number of threads for concurrent crawling (default: 1)")
     args = parser.parse_args()
+
+    if args.proxy_file:
+        load_proxies(args.proxy_file)
 
     try:
         word_counts = get_words_from_url(args.url, args.depth, args.threads)
