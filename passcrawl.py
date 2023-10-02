@@ -8,6 +8,8 @@ from concurrent.futures import ThreadPoolExecutor
 from tabulate import tabulate
 import time
 import urllib3
+import os
+import random
 
 # Disable insecure request warnings globally
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -18,6 +20,7 @@ word_counts = 0
 saved_word_count = 0
 proxies = []
 current_proxy_index = 0
+user_agents = None
 
 
 def display_ascii():
@@ -67,12 +70,28 @@ def get_next_proxy():
 def fetch_url_content(url):
     global number_of_urls
     global numer_of_crawling_errors
-    retry_count = len(proxies)
+    retry_count = len(proxies) if proxies else 1
 
     while retry_count > 0:
         proxy = get_next_proxy()
+        if user_agents:
+            if isinstance(user_agents, list):
+                user_agent = random.choice(user_agents)
+            else:
+                user_agent = user_agents
+        else:
+            user_agent = requests.utils.default_user_agent()
+
+        headers = {
+            "User-Agent": user_agent
+        }
+
         try:
-            response = requests.get(url, verify=False, proxies=proxy)
+            if proxy:
+                response = requests.get(
+                    url, verify=False, proxies=proxy, headers=headers)
+            else:
+                response = requests.get(url, verify=False)
             response.raise_for_status()
             number_of_urls += 1
             return response.text
@@ -135,6 +154,7 @@ def get_words_from_url(url, depth, max_threads, visited_urls=None, word_counts=N
 def main():
     global saved_word_count
     global word_counts
+    global user_agents
 
     start_time = time.perf_counter()
     display_ascii()
@@ -151,6 +171,8 @@ def main():
                         help="Path to a blacklist file containing words that should not be added to the final list.")
     parser.add_argument("-p", "--proxy-file", default=None,
                         help="File containing a list of proxies for proxy rotation.")
+    parser.add_argument("-u", "--user-agent", default=None,
+                        help="User-Agent string or path to a file with a list of User-Agents. If a file path is provided, a User-Agent will be randomly selected from the file. If not provided, the default User-Agent will be used.")
     parser.add_argument("-o", "--output", default="password_list.txt",
                         help="Output file name (default: password_list.txt)")
     parser.add_argument("-t", "--threads", type=int, default=1,
@@ -159,6 +181,13 @@ def main():
 
     if args.proxy_file:
         load_proxies(args.proxy_file)
+
+    if args.user_agent:
+        if os.path.isfile(args.user_agent):
+            with open(args.user_agent, 'r') as file:
+                user_agents = [line.strip() for line in file if line.strip()]
+        else:
+            user_agents = args.user_agent
 
     try:
         word_counts = get_words_from_url(args.url, args.depth, args.threads)
